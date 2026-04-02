@@ -1,0 +1,5 @@
+kubectl create namespace zsvv-main
+
+helm upgrade --install test-db ./.install/postgresql/ -n zsvv-main
+
+kubectl port-forward service/test-db-postgres -n zsvv-main 5432:5432

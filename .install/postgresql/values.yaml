@@ -1,0 +1,25 @@
+image:
+  repository: pgvector/pgvector
+  tag: pg16
+  pullPolicy: IfNotPresent
+
+storage:
+  size: 5Gi
+  className: standard # для minikube подходит standard
+
+database:
+  name: products
+  user: postgres
+  password: postgres # лучше переопределить при установке
+
+service:
+  port: 5432
+  targetPort: 5432
+
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "250m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"

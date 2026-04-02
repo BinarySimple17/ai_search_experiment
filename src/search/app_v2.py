@@ -1,16 +1,47 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, g
 import psycopg2
 import requests
 import json
+import os
 
 app = Flask(__name__)
 
 # Подключение к БД
-conn = psycopg2.connect(
-    host="localhost", port=5432, dbname="products", user="postgres", password="postgres"
-)
+# conn = psycopg2.connect(
+# host="localhost", port=5432, dbname="products", user="postgres", password="postgres"
+# )
+
+# Параметры подключения
+DB_CONFIG = {
+    "host": os.getenv("DB_HOST", "localhost"),
+    "port": os.getenv("DB_PORT", 5432),
+    "dbname": os.getenv("DB_NAME", "products"),
+    "user": os.getenv("DB_USER", "postgres"),
+    "password": os.getenv("DB_PASSWORD", "postgres"),
+}
 
 EMBEDDING_URL = "http://localhost:1234/v1/embeddings"
+LLM_URL = "http://localhost:1234/api/v1/chat"
+
+
+def get_db():
+    """Возвращает соединение с БД (создаёт при первом вызове в рамках запроса)"""
+    if "db" not in g:
+        try:
+            g.db = psycopg2.connect(**DB_CONFIG)
+        except psycopg2.Error as e:
+            # Логируем ошибку, но не даём приложению упасть при старте
+            app.logger.error(f"Database connection failed: {e}")
+            raise
+    return g.db
+
+
+@app.teardown_appcontext
+def close_db(error=None):
+    """Закрывает соединение с БД после завершения запроса"""
+    db = g.pop("db", None)
+    if db is not None:
+        db.close()
 
 
 def parse_query_with_llm(product_name: str) -> dict:
@@ -19,7 +50,8 @@ def parse_query_with_llm(product_name: str) -> dict:
     prompt = f"""Запрос: "{product_name}" /no_think"""
 
     response = requests.post(
-        "http://localhost:1234/api/v1/chat",  # эндпоинт LM Studio
+        # "http://localhost:1234/api/v1/chat",  # эндпоинт LM Studio
+        LLM_URL,  # эндпоинт LM Studio
         json={
             "model": "qwen/qwen3-4b",
             "temperature": 0.1,  # низкая температура для детерминизма
@@ -54,31 +86,14 @@ def parse_query_with_llm(product_name: str) -> dict:
         raise ValueError(f"Failed to parse JSON: {e}\nResponse: {cleaned}")
 
     return parsed
-    # raw = response.json()["choices"][0]["text"].strip()
-
-    # # Извлекаем JSON
-    # start = raw.find("{")
-    # end = raw.rfind("}") + 1
-    # if start != -1 and end != 0:
-    #     return json.loads(raw[start:end])
-    # return {"category": "", "attributes": product_name}
-
-
-# def get_embedding(text):
-#     """Получить вектор для текста (запроса)"""
-#     response = requests.post(
-#         EMBEDDING_URL,
-#         json={"input": text, "model": "text-embedding-qwen3-embedding-4b"},
-#     )
-#     response.raise_for_status()
-#     return response.json()["data"][0]["embedding"]
 
 
 def get_embedding(text: str, dimensions: int = 1024) -> list:
     """Получаем эмбеддинг через LM Studio (для Qwen3-Embedding-4B)"""
 
     response = requests.post(
-        "http://127.0.0.1:1234/v1/embeddings",
+        # "http://127.0.0.1:1234/v1/embeddings",
+        EMBEDDING_URL,
         json={
             "input": text,
             "model": "text-embedding-qwen3-embedding-4b",  # название модели в LM Studio
@@ -91,6 +106,7 @@ def get_embedding(text: str, dimensions: int = 1024) -> list:
 
 def search_products(cat_emb, attr_emb, top_k=5):
     """Поиск ближайших товаров по косинусному расстоянию"""
+    conn = get_db()
     cur = conn.cursor()
 
     # Первый этап: поиск кандидатов по attributes_embedding
@@ -113,18 +129,6 @@ def search_products(cat_emb, attr_emb, top_k=5):
     scored.sort()
     results = [name for _, name in scored[:top_k]]
     return results
-    # cur.execute(
-    #     """
-    #     SELECT name
-    #     FROM products
-    #     ORDER BY embedding <=> %s::vector
-    #     LIMIT %s
-    # """,
-    #     (query_embedding, top_k),
-    # )
-    # results = [row[0] for row in cur.fetchall()]
-    # cur.close()
-    # return results
 
 
 @app.route("/", methods=["GET", "POST"])
