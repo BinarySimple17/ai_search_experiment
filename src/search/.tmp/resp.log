@@ -1,0 +1,22 @@
+2026-03-27 17:32:38  [INFO]
+ [qwen/qwen3-4b] Generated response:  {
+  "model_instance_id": "qwen/qwen3-4b",
+  "output": [
+    {
+      "type": "reasoning",
+      "content": "\n\n"
+    },
+    {
+      "type": "message",
+      "content": "\n\n{\n  \"category\": \"video_game\",\n  \"attributes\": {\n    \"brand\": \"Amazon\",\n    \"model\": \"Sonic The Hedgehog 3\",\n    \"parameters\": \"4K Steelbook, Blu-Ray, Digital Copy\"\n  }\n}"
+    }
+  ],
+  "stats": {
+    "input_tokens": 103,
+    "total_output_tokens": 58,
+    "reasoning_output_tokens": 1,
+    "tokens_per_second": 83.53713513715932,
+    "time_to_first_token_seconds": 0.362
+  },
+  "response_id": "resp_d2ae836ecf3b8b3696423a326fa0069c5efa0f46e242c7a9"
+}
